@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Трекер прогресса</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 24px;
+    text-align: center;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #2563eb; }
+  .btn-secondary { background: #334155; }
+  .btn-secondary:hover { background: #475569; }
+  .btn-danger { background: #dc2626; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-small { padding: 6px 12px; font-size: 13px; }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .goal-card {
+    background: #1e293b;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid #334155;
+    transition: border-color 0.2s;
+  }
+  .goal-card:hover { border-color: #475569; }
+
+  .goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .goal-title {
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .goal-title:hover { color: #60a5fa; }
+  .goal-hint { font-size: 12px; color: #64748b; font-weight: 400; }
+
+  .progress-bar-wrap {
+    position: relative;
+    height: 32px;
+    background: #0f172a;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    border: 1px solid #334155;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    transition: width 0.4s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    min-width: fit-content;
+  }
+  .progress-bar-fill.low { padding-left: 10px; justify-content: flex-start; }
+
+  .goal-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .goal-stats span b { color: #e2e8f0; }
+
+  .goal-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .goal-days {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed #334155;
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.8;
+  }
+  .goal-days b { color: #e2e8f0; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #1e293b;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 460px;
+    border: 1px solid #334155;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 { margin-bottom: 18px; font-size: 20px; }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .field input, .field textarea {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .field input:focus, .field textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+  }
+  .empty p { margin-bottom: 16px; }
+
+  .status-msg {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #10b981;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 200;
+  }
+  .status-msg.show { opacity: 1; }
+  .status-msg.error { background: #dc2626; }
+
+  @media (max-width: 600px) {
+    body { padding: 14px; }
+    h1 { font-size: 22px; }
+    .goal-card { padding: 16px; }
+    .goal-header { flex-direction: column; }
+    .goal-actions { width: 100%; }
+    .goal-actions .btn { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎯 Трекер прогресса</h1>
+
+  <div class="toolbar">
+    <div id="todayInfo" style="font-size:14px;color:#94a3b8;"></div>
+    <button class="btn" onclick="openGoalModal()">+ Новая цель</button>
+  </div>
+
+  <div id="goalsList"></div>
+</div>
+
+<!-- Модалка создания/редактирования цели -->
+<div class="modal-overlay" id="goalModal">
+  <div class="modal">
+    <h2 id="goalModalTitle">Новая цель</h2>
+    <input type="hidden" id="goalId">
+    <div class="field">
+      <label>Название цели</label>
+      <input type="text" id="goalName" placeholder="Например: Прочитать 12 книг">
+    </div>
+    <div class="field">
+      <label>Дата начала</label>
+      <input type="date" id="goalStart">
+    </div>
+    <div class="field">
+      <label>Дата окончания</label>
+      <input type="date" id="goalEnd">
+    </div>
+    <div class="field">
+      <label>Начальное значение</label>
+      <input type="number" id="goalStartVal" value="0" step="any">
+    </div>
+    <div class="field">
+      <label>Конечная цель</label>
+      <input type="number" id="goalTargetVal" value="100" step="any">
+    </div>
+    <div class="field">
+      <label>Текущее значение</label>
+      <input type="number" id="goalCurrentVal" value="0" step="any">
+    </div>
+    <div class="field">
+      <label>Заметка (необязательно)</label>
+      <textarea id="goalNote" placeholder="Дополнительная информация..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeGoalModal()">Отмена</button>
+      <button class="btn" onclick="saveGoal()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка обновления прогресса -->
+<div class="modal-overlay" id="updateModal">
+  <div class="modal">
+    <h2>Обновить прогресс</h2>
+    <input type="hidden" id="updateGoalId">
+    <div class="field">
+      <label>Новое текущее значение</label>
+      <input type="number" id="updateValue" step="any">
+    </div>
+    <div class="field">
+      <label>Или добавить к текущему</label>
+      <input type="number" id="updateDelta" step="any" placeholder="Например: +5">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeUpdateModal()">Отмена</button>
+      <button class="btn" onclick="saveProgress()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="status-msg" id="statusMsg"></div>
+
+<script>
+// ===== Состояние =====
+let goals = [];
+let expandedGoals = new Set();
+
+const STORAGE_KEY = 'progress_tracker_goals_v1';
+
+// ===== Утилиты =====
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function parseDate(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function daysBetween(a, b) {
+  const MS = 86400000;
+  return Math.round((b - a) / MS);
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = parseDate(s);
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function showStatus(msg, isError = false) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.classList.toggle('error', isError);
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ===== Хранилище =====
+function loadGoals() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    goals = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(goals)) goals = [];
+  } catch (e) {
+    goals = [];
+  }
+}
+
+function saveGoals() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+}
+
+// ===== Расчёты =====
+function calcProgress(goal) {
+  const start = Number(goal.startVal) || 0;
+  const target = Number(goal.targetVal) || 0;
+  const current = Number(goal.currentVal) || 0;
+
+  const total = target - start;
+  let percent = 0;
+  if (total !== 0) {
+    percent = ((current - start) / total) * 100;
+  }
+  percent = Math.max(0, Math.min(100, percent));
+
+  // Дни
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const startDate = goal.start ? parseDate(goal.start) : null;
+  const endDate = goal.end ? parseDate(goal.end) : null;
+
+  let totalDays = null;
+  let elapsedDays = null;
+  let remainingDays = null;
+  let daysPercent = null;
+
+  if (startDate && endDate) {
+    totalDays = daysBetween(startDate, endDate);
+    elapsedDays = Math.max(0, Math.min(totalDays, daysBetween(startDate, today)));
+    remainingDays = Math.max(0, totalDays - elapsedDays);
+    if (totalDays > 0) {
+      daysPercent = Math.max(0, Math.min(100, (elapsedDays / totalDays) * 100));
+    } else {
+      daysPercent = 100;
+    }
+  }
+
+  // Прогноз: успеваем ли
+  let pace = null;
+  if (totalDays > 0 && elapsedDays > 0) {
+    const expectedPercent = (elapsedDays / totalDays) * 100;
+    pace = percent - expectedPercent; // >0 — опережаем, <0 — отстаём
+  }
+
+  return { percent, totalDays, elapsedDays, remainingDays, daysPercent, pace };
+}
+
+// ===== Рендер =====
+function render() {
+  const list = document.getElementById('goalsList');
+  const today = new Date();
+  document.getElementById('todayInfo').textContent =
+    'Сегодня: ' + today.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  if (goals.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <p>Пока нет ни одной цели.</p>
+        <button class="btn" onclick="openGoalModal()">Создать первую цель</button>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = goals.map(g => {
+    const p = calcProgress(g);
+    const expanded = expandedGoals.has(g.id);
+    const isLow = p.percent < 20;
+
+    let paceText = '';
+    if (p.pace !== null) {
+      if (p.pace >= 5) paceText = `<span style="color:#10b981">✓ Опережаешь график на ${p.pace.toFixed(1)}%</span>`;
+      else if (p.pace <= -5) paceText = `<span style="color:#f59e0b">⚠ Отстаёшь от графика на ${Math.abs(p.pace).toFixed(1)}%</span>`;
+      else paceText = `<span style="color:#94a3b8">≈ Идёшь по графику</span>`;
+    }
+
+    const daysBlock = expanded ? `
+      <div class="goal-days">
+        <div>📅 Начало: <b>${fmtDate(g.start)}</b> — Конец: <b>${fmtDate(g.end)}</b></div>
+        ${p.totalDays !== null ? `
+          <div>Всего дней: <b>${p.totalDays}</b> · Прошло: <b>${p.elapsedDays}</b> · Осталось: <b>${p.remainingDays}</b></div>
+          <div>Прогресс по времени: <b>${p.daysPercent.toFixed(1)}%</b></div>
+        ` : '<div>Даты не заданы</div>'}
+        ${paceText ? `<div>${paceText}</div>` : ''}
+        ${g.note ? `<div style="margin-top:8px;">📝 ${escapeHtml(g.note)}</div>` : ''}
+      </div>` : '';
+
+    return `
+      <div class="goal-card">
+        <div class="goal-header">
+          <div>
+            <div class="goal-title" onclick="toggleExpand('${g.id}')" title="Нажми, чтобы ${expanded ? 'скрыть' : 'показать'} детали по дням">
+              ${escapeHtml(g.name)}
+              <span class="goal-hint">${expanded ? '▲ по дням' : '▼ по дням'}</span>
+            </div>
+          </div>
+          <div class="goal-actions">
+            <button class="btn btn-small" onclick="openUpdateModal('${g.id}')">+ Прогресс</button>
+            <button class="btn btn-small btn-secondary" onclick="openGoalModal('${g.id}')">Изменить</button>
+            <button class="btn btn-small btn-danger" onclick="deleteGoal('${g.id}')">Удалить</button>
+          </div>
+        </div>
+
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill ${isLow ? 'low' : ''}" style="width:${p.percent}%">
+            ${p.percent.toFixed(1)}%
+          </div>
+        </div>
+
+        <div class="goal-stats">
+          <span>Старт: <b>${g.startVal}</b></span>
+          <span>Сейчас: <b>${g.currentVal}</b></span>
+          <span>Цель: <b>${g.targetVal}</b></span>
+        </div>
+
+        ${daysBlock}
+      </div>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function toggleExpand(id) {
+  if (expandedGoals.has(id)) expandedGoals.delete(id);
+  else expandedGoals.add(id);
+  render();
+}
+
+// ===== Модалка цели =====
+function openGoalModal(id = null) {
+  const modal = document.getElementById('goalModal');
+  document.getElementById('goalModalTitle').textContent = id ? 'Редактировать цель' : 'Новая цель';
+  document.getElementById('goalId').value = id || '';
+
+  if (id) {
+    const g = goals.find(x => x.id === id);
+    if (!g) return;
+    document.getElementById('goalName').value = g.name;
+    document.getElementById('goalStart').value = g.start || '';
+    document.getElementById('goalEnd').value = g.end || '';
+    document.getElementById('goalStartVal').value = g.startVal;
+    document.getElementById('goalTargetVal').value = g.targetVal;
+    document.getElementById('goalCurrentVal').value = g.currentVal;
+    document.getElementById('goalNote').value = g.note || '';
+  } else {
+    document.getElementById('goalName').value = '';
+    document.getElementById('goalStart').value = todayStr();
+    document.getElementById('goalEnd').value = '';
+    document.getElementById('goalStartVal').value = 0;
+    document.getElementById('goalTargetVal').value = 100;
+    document.getElementById('goalCurrentVal').value = 0;
+    document.getElementById('goalNote').value = '';
+  }
+  modal.classList.add('active');
+}
+
+function closeGoalModal() {
+  document.getElementById('goalModal').classList.remove('active');
+}
+
+function saveGoal() {
+  const id = document.getElementById('goalId').value;
+  const name = document.getElementById('goalName').value.trim();
+  const start = document.getElementById('goalStart').value;
+  const end = document.getElementById('goalEnd').value;
+  const startVal = Number(document.getElementById('goalStartVal').value);
+  const targetVal = Number(document.getElementById('goalTargetVal').value);
+  const currentVal = Number(document.getElementById('goalCurrentVal').value);
+  const note = document.getElementById('goalNote').value.trim();
+
+  if (!name) { showStatus('Введи название цели', true); return; }
+  if (start && end && parseDate(end) < parseDate(start)) {
+    showStatus('Дата окончания раньше даты начала', true); return;
+  }
+  if (startVal === targetVal) {
+    showStatus('Начальное и конечное значения не должны совпадать', true); return;
+  }
+
+  if (id) {
+    const g = goals.find(x => x.id === id);
+    Object.assign(g, { name, start, end, startVal, targetVal, currentVal, note });
+  } else {
+    goals.push({
+      id: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      name, start, end, startVal, targetVal, currentVal, note,
+      createdAt: new Date().toISOString()
+    });
+  }
+  saveGoals();
+  closeGoalModal();
+  render();
+  showStatus('Сохранено');
+}
+
+// ===== Модалка прогресса =====
+function openUpdateModal(id) {
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('updateGoalId').value = id;
+  document.getElementById('updateValue').value = g.currentVal;
+  document.getElementById('updateDelta').value = '';
+  document.getElementById('updateModal').classList.add('active');
+}
+
+function closeUpdateModal() {
+  document.getElementById('updateModal').classList.remove('active');
+}
+
+function saveProgress() {
+  const id = document.getElementById('updateGoalId').value;
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+
+  const valStr = document.getElementById('updateValue').value.trim();
+  const deltaStr = document.getElementById('updateDelta').value.trim();
+
+  if (deltaStr !== '') {
+    const delta = Number(deltaStr);
+    if (isNaN(delta)) { showStatus('Некорректное значение', true); return; }
+    g.currentVal = Number(g.currentVal) + delta;
+  } else {
+    const val = Number(valStr);
+    if (isNaN(val)) { showStatus('Некорректное значение', true); return; }
+    g.currentVal = val;
+  }
+
+  saveGoals();
+  closeUpdateModal();
+  render();
+  showStatus('Прогресс обновлён');
+}
+
+// ===== Удаление =====
+function deleteGoal(id) {
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  if (!confirm(`Удалить цель "${g.name}"?`)) return;
+  goals = goals.filter(x => x.id !== id);
+  expandedGoals.delete(id);
+  saveGoals();
+  render();
+  showStatus('Цель удалена');
+}
+
+// ===== Закрытие модалок по клику на фон / Esc =====
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', e => {
+    if (e.target === ov) ov.classList.remove('active');
+  });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+  }
+});
+
+// ===== Старт =====
+loadGoals();
+render();
+</script>
+</body>
+</html>
